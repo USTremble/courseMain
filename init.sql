@@ -1,6 +1,6 @@
 CREATE TABLE users (
     user_id SERIAL PRIMARY KEY,
-    username VARCHAR(32) NOT NULL,
+    username VARCHAR(32) NOT NULL UNIQUE,
     password TEXT NOT NULL,
     role VARCHAR(10) NOT NULL DEFAULT 'player',
     is_blocked BOOLEAN NOT NULL DEFAULT FALSE
