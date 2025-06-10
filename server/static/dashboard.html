@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Главная</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body>
+  
+  <nav class="sidebar"><div class="logo">CyberBattle</div><div id="navLinks"></div></nav>
+  <header class="topbar"><div class="top-title">Главная</div>
+    <div class="avatar-menu"><span id="uname"></span>
+      <img src="/static/default-avatar.png" class="avatar" id="aBtn">
+      <div class="dropdown" id="dd"><a href="/profile.html">Профиль</a><a href="#" id="lo">Выйти</a></div>
+    </div>
+  </header>
+  
+  <main>
+    <h1 style="text-align:center;margin:20px 0">CyberBattle</h1>
+    <section class="content-box" style="max-width:900px;margin:auto">
+      <p>
+        Добро пожаловать на CyberBattle — платформу для командных соревнований в формате викторин и CTF! 
+      </p>
+      <p>
+        Ниже представлены 15 последних завершённых событий, их победители и таблицы лидеров. 
+      </p>
+      <p>Погрузитесь в атмосферу соревнований и готовьтесь к новым вызовам!</p>
+      
+    </section>
+    <h2>Прошедшие события</h2>
+  
+    <h2 id="noev" style="margin-top:36px;display:none">Завершённых событий пока нет.</h2>
+    <div class="card-grid" id="evGrid"></div>
+  </main>
+  
+  <script type="module">
+    import { initCommon } from '/static/js/common.js';
+    await initCommon('Главная');
+    
+    const html = s => { const t = document.createElement('template'); t.innerHTML = s.trim(); return t.content.firstChild; };
+  
+    const res = await fetch('/api/dashboard',{credentials:'include'});
+    const data = (await res.json()).data;
+    if(!data.length) document.getElementById('noev').style.display = 'block';
+  
+    const grid = document.getElementById('evGrid');
+    data.forEach(ev => {
+      const card = html(`
+        <div class="card">
+          <h4>${ev.name}</h4>
+          <p>Тип: ${ev.type.toUpperCase()}</p>
+          <p>${ev.description}</p>
+          <p>Победитель: <strong>${ev.winner}</strong></p>
+          <button class="btn">Подробнее</button>
+        </div>
+      `);
+      const dlg = html(`
+        <div class="modal">
+          <div class="modal-body">
+            <h3 style="margin-top:0">${ev.name}</h3>
+            <p>${ev.description}</p>
+            <p><strong>Проводящий соревнования:</strong> ${ev.host}</p>
+            <p><strong>Тип:</strong> ${ev.type.toUpperCase()}</p>
+            <h4 style="margin:10px 0 12px; text-align:center">Лидерборд</h4>
+            <table class="admin-table">
+              <thead>
+                <tr><th>#</th><th>Команда</th><th>Очки</th></tr>
+              </thead>
+              <tbody id="lb"></tbody>
+            </table>
+            <button class="btn close-btn">Закрыть</button>
+          </div>
+        </div>
+      `);
+      // заполняем лидерборд
+      ev.leaderboard.forEach(r => {
+        dlg.querySelector('tbody').appendChild(
+          html(`<tr${r[1]===ev.winner?' style="background:#FFD300"':''}>
+                  <td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td>
+               </tr>`)
+        );
+      });
+      card.querySelector('.btn').onclick = () => dlg.style.display = 'flex';
+      dlg.querySelector('.close-btn').onclick = () => dlg.style.display = 'none';
+      dlg.onclick = e => { if (e.target === dlg) dlg.style.display = 'none'; };
+      document.body.appendChild(dlg);
+      grid.appendChild(card);
+    });
+  </script>
+  
+  
+</body>
+</html>

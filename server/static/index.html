@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>CyberBattle</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="/static/css/public.css">
+</head>
+<body>
+<header class="topbar-public">
+  <div class="brand">CyberBattle</div>
+  <div class="auth-links">
+    <a href="/login.html" class="btn btn-outline">Вход</a>
+    <a href="/register.html" class="btn btn-primary">Регистрация</a>
+  </div>
+</header>
+
+<main style="padding-top:100px;text-align:center">
+  <h1>Добро пожаловать на CyberBattle!</h1>
+  <p>Это платформа для командных соревнований. Войдите или зарегистрируйтесь, чтобы участвовать.</p>
+  <p>Участвуйте в онлайн-викторинах и CTF-соревнованиях, соревнуясь с командами со всего мира и прокачивая свои навыки в области кибербезопасности и логики.</p>
+</main>
+
+<script>
+// если уже залогинен → сразу на dashboard
+fetch('/api/auth/me',{credentials:'include'})
+  .then(r=>r.ok?r.json():Promise.reject())
+  .then(()=>location.replace('/dashboard.html'))
+  .catch(()=>{});
+</script>
+</body>
+</html>

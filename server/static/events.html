@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>События</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body class="page page--events">
+  <nav class="sidebar"><div class="logo">CyberBattle</div><div id="navLinks"></div></nav>
+  <header class="topbar">
+    <div class="top-title" id="pageTitle">События</div>
+    <div class="avatar-menu">
+      <span id="uname"></span>
+      <img src="/static/default-avatar.png" class="avatar" id="aBtn">
+      <div class="dropdown" id="dd">
+        <a href="/profile.html">Профиль</a>
+        <a href="#" id="lo">Выйти</a>
+      </div>
+    </div>
+  </header>
+
+  <main style="padding-bottom:60px">
+    <h1>События</h1>
+    <div id="content"></div>
+  </main>
+
+  <script type="module">
+    import { initCommon } from '/static/js/common.js';
+    await initCommon('События');
+
+    const $    = s => document.querySelector(s);
+    const html = s => { const t = document.createElement('template'); t.innerHTML = s.trim(); return t.content.firstChild; };
+
+    let currentEvent = null;
+    let leaderboard   = [];
+    let lbPage        = 1;
+    const PER         = 10;
+    let pollId        = null;
+
+    // храним id завершённого события, которое пользователь закрыл
+    let dismissedEventId = localStorage.getItem('dismissedEventId');
+
+    document.addEventListener('click', e => {
+      if (e.target && e.target.id === 'cancelBtn') {
+        // Отмена участия во время ожидания
+        fetch('/api/events/leave', {
+          method: 'POST',
+          credentials: 'include',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ event_id: currentEvent[0] })
+        }).then(() => {
+          currentEvent = null;
+          render();
+        });
+      }
+    });
+
+    async function render() {
+      clearInterval(pollId);
+      lbPage = 1;
+      const res = await fetch('/api/events', { credentials: 'include' });
+      if (!res.ok) {
+        $('#content').innerHTML = `<p style="color:#fff;padding:18px">Ошибка загрузки событий.</p>`;
+        return;
+      }
+      const { data } = await res.json();
+      const root    = $('#content');
+      root.innerHTML = '';
+
+      if (!data.team) {
+        root.appendChild(html(`<p style="color:#fff;padding:18px">Сначала нужно создать или присоединиться к команде.</p>`));
+        return;
+      }
+
+      currentEvent = data.current_event;
+      leaderboard   = data.leaderboard;
+
+      // если текущее событие завершено и его id совпадает с тем, что пользователь уже закрыл — скрываем его
+      if (currentEvent && currentEvent[2] === 'finished' && String(currentEvent[0]) === dismissedEventId) {
+        currentEvent = null;
+      }
+
+      if (!currentEvent) {
+        showJoin(data.waiting);
+      } else {
+        const status = currentEvent[2];
+        if (status === 'waiting')      showWaiting();
+        else if (status === 'running') showRunning();
+        else                            showFinished();
+      }
+    }
+
+    function showJoin(waiting) {
+      const root = $('#content');
+      root.appendChild(html(`
+        <div class="content-box" style="max-width:420px;margin:auto">
+          <h3>Присоединиться по коду</h3>
+          <form id="joinF">
+            <input name="code" maxlength="16" required placeholder="Код события"
+                   style="padding:6px 8px;width:220px;margin-right:6px">
+            <button class="btn" type="submit">Присоединиться</button>
+          </form>
+        </div>
+      `));
+      $('#joinF').onsubmit = async e => {
+        e.preventDefault();
+        const code = new FormData(e.target).get('code').trim();
+        const res = await fetch('/api/events/join', {
+          method:'POST', credentials:'include',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({ code })
+        });
+        const j = await res.json();
+        if (!res.ok) {
+          alert(j.msg);
+          return;
+        }
+        await render();
+      };
+
+      if (waiting.length) {
+        root.appendChild(html(`<h3 style="margin-top:24px;color:#fff">Доступные события</h3>`));
+        const grid = html('<div class="card-grid"></div>');
+        waiting.forEach(ev => {
+          const card = html(`
+            <div class="card">
+              <h4>${ev[1]}</h4>
+              <p>${ev[3]}</p>
+              <p>Тип: ${ev[2].toUpperCase()}</p>
+              <p>Команд: ${ev[4]}</p>
+              <button class="btn" data-eid="${ev[0]}" type="button">Участвовать</button>
+            </div>
+          `);
+          card.querySelector('button').onclick = async () => {
+            const res = await fetch('/api/events/join', {
+              method:'POST', credentials:'include',
+              headers:{'Content-Type':'application/json'},
+              body:JSON.stringify({ event_id: ev[0] })
+            });
+            const j = await res.json();
+            if (!res.ok) {
+              alert(j.msg);
+              return;
+            }
+            await render();
+          };
+          grid.appendChild(card);
+        });
+        root.appendChild(grid);
+      } else {
+        root.appendChild(html(`<p style="margin-top:20px;color:#fff">Нет доступных событий.</p>`));
+      }
+    }
+
+    function showWaiting() {
+      const ev   = currentEvent;
+      const root = $('#content');
+      root.appendChild(html(`
+        <div class="content-box" style="max-width:480px;margin:auto">
+          <h2>${ev[1]}</h2>
+          <p>${ev[4]}</p>
+          <p style="color:#fff;margin-top:12px"><em>Ожидаем начала...</em></p>
+          <button id="cancelBtn" class="btn btn-outline" type="button" style="margin-top:12px">
+            Отменить участие
+          </button>
+        </div>
+      `));
+    }
+
+    function showRunning() {
+      const ev   = currentEvent;
+      const root = $('#content');
+      root.appendChild(html(`
+        <div class="content-box" style="max-width:600px;margin:auto">
+          <h2>${ev[1]}</h2>
+          <p>${ev[4]}</p>
+        </div>
+      `));
+      if (ev[5]) {
+        root.appendChild(html(`
+          <div style="text-align:center;margin:16px">
+            <a href="/static/${ev[5]}" class="link" download>Скачать задание</a>
+          </div>
+        `));
+      }
+      root.appendChild(html(`
+        <form id="ansF" style="text-align:center;margin-bottom:24px">
+          <input name="answer" required placeholder="Ваш ответ"
+                 style="padding:6px 8px;width:240px;margin-right:6px">
+          <button class="btn" type="submit">Отправить</button>
+        </form>
+      `));
+      $('#ansF').onsubmit = async e => {
+        e.preventDefault();
+        const ans = new FormData(e.target).get('answer').trim();
+        await fetch(`/api/events/submit/${ev[0]}`, {
+          method:'POST', credentials:'include',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({ answer: ans })
+        });
+        e.target.reset();
+        await updateLB();
+      };
+      root.appendChild(html(`<h3 style="color:#fff;text-align:center">Лидерборд</h3>`));
+      root.appendChild(html(`
+        <table class="admin-table small" id="lbTbl"><thead>
+          <tr><th>#</th><th>Команда</th><th>Очки</th></tr>
+        </thead><tbody></tbody></table>
+        <div class="table-pagination" id="lbPg" style="text-align:right;margin-top:8px"></div>
+      `));
+      fillLB(leaderboard);
+      pollId = setInterval(updateLB, 5000);
+    }
+
+    function showFinished() {
+      const ev   = currentEvent;
+      const root = $('#content');
+      root.appendChild(html(`
+        <div class="content-box" style="max-width:600px;margin:auto">
+          <h3 style="color:#fff">Событие завершено</h3>
+          <table class="admin-table small" id="lbTbl"><thead>
+            <tr><th>#</th><th>Команда</th><th>Очки</th></tr>
+          </thead><tbody></tbody></table>
+          <div class="table-pagination" id="lbPg" style="text-align:right;margin-top:8px"></div>
+          <div style="text-align:center">
+            <button id="closeBtn" class="btn" type="button" style="margin-top:16px">
+              Закрыть
+            </button>
+          </div>
+        </div>
+      `));
+      document.getElementById('closeBtn').onclick = () => {
+        // это событие пользователь закрыл
+        localStorage.setItem('dismissedEventId', String(ev[0]));
+        dismissedEventId = String(ev[0]);
+        currentEvent = null;
+        render();
+      };
+      fillLB(leaderboard);
+    }
+
+    function fillLB(arr) {
+      const tbody = $('#lbTbl tbody');
+      tbody.innerHTML = '';
+      const pages = Math.max(1, Math.ceil(arr.length / PER));
+      if (lbPage > pages) lbPage = pages;
+      arr.slice((lbPage-1)*PER, lbPage*PER).forEach(r => {
+        tbody.appendChild(html(`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`));
+      });
+      const pg = $('#lbPg');
+      pg.innerHTML = '';
+      for (let p = 1; p <= pages; p++) {
+        pg.insertAdjacentHTML('beforeend',
+          p === lbPage
+            ? `<strong>${p}</strong>`
+            : `<a href="#" data-p="${p}">${p}</a>`
+        );
+      }
+      pg.querySelectorAll('a[data-p]').forEach(a => {
+        a.onclick = e => {
+          e.preventDefault();
+          lbPage = +a.dataset.p;
+          fillLB(arr);
+        };
+      });
+    }
+
+    async function updateLB() {
+      const res = await fetch('/api/events', { credentials:'include' });
+      if (!res.ok) return;
+      const { data } = await res.json();
+      leaderboard = data.leaderboard;
+      fillLB(leaderboard);
+    }
+
+    render();
+  </script>
+
+</body>
+</html>
