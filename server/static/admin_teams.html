@@ -77,82 +77,148 @@
       return `<a href="#" data-sort="${field}">${label}${icon}</a>`;
     }
 
-    async function load(){
-      $('#tbl thead').innerHTML = '<tr><th colspan="5">Загрузка…</th></tr>';
-      $('#tbl tbody').innerHTML = '';
-      $('#pager').innerHTML = '';
+    async function load() {
+      const tblHead = $('#tbl thead');
+      const tblBody = $('#tbl tbody');
+      const pager = $('#pager');
 
+      // Очистка
+      tblHead.innerHTML = '';
+      tblBody.innerHTML = '';
+      pager.innerHTML = '';
+
+      // Загрузка
       const res = await fetch(
-        `/api/admin/teams?page=${page}&q=${encodeURIComponent(q)}` +
-        `&sort=${sort}&dir=${dir}`,
-        { credentials:'include' }
+        `/api/admin/teams?page=${page}&q=${encodeURIComponent(q)}&sort=${sort}&dir=${dir}`,
+        { credentials: 'include' }
       );
       if (!res.ok) {
-        alert('Ошибка API: '+res.status);
+        alert('Ошибка API: ' + res.status);
         return;
       }
       const { data } = await res.json();
 
       // Заголовки
-      $('#tbl thead').innerHTML = `
-        <tr>
-          <th>${hdr('team_id','TID')}</th>
-          <th>${hdr('team_name','Имя команды')}</th>
-          <th>${hdr('members','Кол-во участников')}</th>
-          <th>UID участников</th>
-          <th>Действие</th>
-        </tr>`;
-      $$('#tbl thead a[data-sort]').forEach(a=>{
-        a.onclick = e=>{
+      const headerRow = document.createElement('tr');
+      const headers = [
+        { field: 'team_id', label: 'TID' },
+        { field: 'team_name', label: 'Имя команды' },
+        { field: 'members', label: 'Кол-во участников' },
+        { field: null, label: 'UID участников' },
+        { field: null, label: 'Действие' },
+      ];
+
+      headers.forEach(h => {
+        const th = document.createElement('th');
+        if (h.field) {
+          const a = document.createElement('a');
+          a.href = '#';
+          a.dataset.sort = h.field;
+          a.textContent = h.label;
+          th.appendChild(a);
+        } else {
+          th.textContent = h.label;
+        }
+        headerRow.appendChild(th);
+      });
+
+      tblHead.appendChild(headerRow);
+
+      $$('#tbl thead a[data-sort]').forEach(a => {
+        a.onclick = e => {
           e.preventDefault();
           const f = a.dataset.sort;
-          if (sort===f) dir = dir==='asc'?'desc':'asc';
-          else { sort = f; dir = 'asc'; }
-          page = 1; updateURL(); load();
+          if (sort === f) dir = dir === 'asc' ? 'desc' : 'asc';
+          else {
+            sort = f;
+            dir = 'asc';
+          }
+          page = 1;
+          updateURL();
+          load();
         };
       });
 
-      // Тело таблицы
-      const body = $('#tbl tbody');
+      // Тело
       if (!data.teams.length) {
-        body.innerHTML = '<tr><td colspan="5">Ничего не найдено</td></tr>';
+        const row = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = 5;
+        td.textContent = 'Ничего не найдено';
+        row.appendChild(td);
+        tblBody.appendChild(row);
       } else {
-        body.innerHTML = data.teams.map(t=>`
-          <tr>
-            <td>${t[0]}</td>
-            <td>${t[1]}</td>
-            <td>${t[3]}</td>
-            <td>${t[2]||'—'}</td>
-            <td>
-              <div class="action-wrapper">
-                <span class="action-btn">Выполнить действие</span>
-                <div class="action-menu">
-                  <button data-tid="${t[0]}" class="disband">Расформировать</button>
-                  <button data-tid="${t[0]}" class="kick">Исключить участника</button>
-                  <button data-tid="${t[0]}" class="delete red">Удалить</button>
-                </div>
-              </div>
-            </td>
-          </tr>`).join('');
-        // действия
-        $$('#tbl tbody .action-menu button').forEach(btn=>{
+        data.teams.forEach(t => {
+          const row = document.createElement('tr');
+
+          const td1 = document.createElement('td');
+          td1.textContent = t[0];
+          row.appendChild(td1);
+
+          const td2 = document.createElement('td');
+          td2.textContent = t[1];
+          row.appendChild(td2);
+
+          const td3 = document.createElement('td');
+          td3.textContent = t[3];
+          row.appendChild(td3);
+
+          const td4 = document.createElement('td');
+          td4.textContent = t[2] || '—';
+          row.appendChild(td4);
+
+          const td5 = document.createElement('td');
+          const wrapper = document.createElement('div');
+          wrapper.className = 'action-wrapper';
+
+          const btnSpan = document.createElement('span');
+          btnSpan.className = 'action-btn';
+          btnSpan.textContent = 'Выполнить действие';
+          wrapper.appendChild(btnSpan);
+
+          const menu = document.createElement('div');
+          menu.className = 'action-menu';
+
+          ['disband', 'kick', 'delete'].forEach(type => {
+            const btn = document.createElement('button');
+            btn.dataset.tid = t[0];
+            btn.textContent = type === 'disband' ? 'Расформировать' :
+                              type === 'kick' ? 'Исключить участника' : 'Удалить';
+            if (type === 'delete') btn.classList.add('red');
+            btn.classList.add(type);
+            menu.appendChild(btn);
+          });
+
+          wrapper.appendChild(menu);
+          td5.appendChild(wrapper);
+          row.appendChild(td5);
+          tblBody.appendChild(row);
+        });
+
+        $$('#tbl tbody .action-menu button').forEach(btn => {
           btn.onclick = async () => {
             const tid = btn.dataset.tid;
             let act;
-            if (btn.classList.contains('disband')) act = 'disband';
-            else if (btn.classList.contains('kick')) {
+            let body = { tid };
+
+            if (btn.classList.contains('disband')) {
+              act = 'disband';
+            } else if (btn.classList.contains('kick')) {
               act = 'kick';
               const uid = prompt('UID участника для исключения:');
               if (!uid) return;
-              var body = { tid, act, kick_uid: uid };
+              body.kick_uid = uid;
+            } else if (btn.classList.contains('delete')) {
+              act = 'delete';
+              if (!confirm(`Удалить команду ${tid}?`)) return;
             }
-            else act = 'delete';
-            if (act==='delete' && !confirm(`Удалить команду ${tid}?`)) return;
-            await fetch('/api/admin/team_action',{
-              method:'POST',
-              credentials:'include',
-              headers:{'Content-Type':'application/json'},
-              body: JSON.stringify(body || { tid, act })
+
+            body.act = act;
+            await fetch('/api/admin/team_action', {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(body)
             });
             load();
           };
@@ -160,21 +226,31 @@
       }
 
       // Пагинация
-      for(let p=1; p<=data.pages; p++){
-        if (p===data.page) {
-          $('#pager').insertAdjacentHTML('beforeend', `<strong>${p}</strong>`);
+      for (let p = 1; p <= data.pages; p++) {
+        if (p === data.page) {
+          const strong = document.createElement('strong');
+          strong.textContent = p;
+          pager.appendChild(strong);
         } else {
-          $('#pager').insertAdjacentHTML('beforeend',
-            `<a href="#" data-p="${p}">${p}</a>`);
+          const a = document.createElement('a');
+          a.href = '#';
+          a.dataset.p = p;
+          a.textContent = p;
+          pager.appendChild(a);
         }
       }
-      $$('#pager a').forEach(a=>{
-        a.onclick = e=>{
+
+      $$('#pager a').forEach(a => {
+        a.onclick = e => {
           e.preventDefault();
-          page = +a.dataset.p; updateURL(); load();
+          page = +a.dataset.p;
+          updateURL();
+          load();
         };
       });
     }
+
+
 
     load();
   </script>

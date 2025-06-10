@@ -76,99 +76,188 @@
       return `<a href="#" data-sort="${field}">${label}${icon}</a>`;
     }
 
-    async function load(){
-      $('#tbl thead').innerHTML = '<tr><th colspan="6">Загрузка…</th></tr>';
-      $('#tbl tbody').innerHTML = '';
-      $('#pager').innerHTML = '';
+    async function load() {
+      const tblHead = $('#tbl thead');
+      const tblBody = $('#tbl tbody');
+      const pager = $('#pager');
 
+      // Очистка
+      tblHead.innerHTML = '';
+      tblBody.innerHTML = '';
+      pager.innerHTML = '';
+
+      // Индикатор загрузки
+      const loadingRow = document.createElement('tr');
+      const loadingCell = document.createElement('th');
+      loadingCell.colSpan = 6;
+      loadingCell.textContent = 'Загрузка…';
+      loadingRow.appendChild(loadingCell);
+      tblHead.appendChild(loadingRow);
+
+      // Загрузка
       const res = await fetch(
-        `/api/admin/users?page=${page}&q=${encodeURIComponent(q)}` +
-        `&sort=${sort}&dir=${dir}`,
-        { credentials:'include' }
+        `/api/admin/users?page=${page}&q=${encodeURIComponent(q)}&sort=${sort}&dir=${dir}`,
+        { credentials: 'include' }
       );
       if (!res.ok) {
-        alert('Ошибка API: '+res.status);
+        alert('Ошибка API: ' + res.status);
         return;
       }
       const { data } = await res.json();
 
-      // заголовки
-      $('#tbl thead').innerHTML = `
-        <tr>
-          <th>${hdr('user_id','UID')}</th>
-          <th>${hdr('username','Логин')}</th>
-          <th>Команда (TID)</th>
-          <th>${hdr('role','Роль')}</th>
-          <th>${hdr('is_blocked','Статус')}</th>
-          <th>Действие</th>
-        </tr>`;
-      $$('#tbl thead a[data-sort]').forEach(a=>{
-        a.onclick = e=>{
+      // Заголовки
+      tblHead.innerHTML = '';
+      const headerRow = document.createElement('tr');
+      const headers = [
+        { field: 'user_id', label: 'UID' },
+        { field: 'username', label: 'Логин' },
+        { field: null, label: 'Команда (TID)' },
+        { field: 'role', label: 'Роль' },
+        { field: 'is_blocked', label: 'Статус' },
+        { field: null, label: 'Действие' }
+      ];
+
+      headers.forEach(h => {
+        const th = document.createElement('th');
+        if (h.field) {
+          const a = document.createElement('a');
+          a.href = '#';
+          a.dataset.sort = h.field;
+          a.textContent = h.label;
+          th.appendChild(a);
+        } else {
+          th.textContent = h.label;
+        }
+        headerRow.appendChild(th);
+      });
+
+      tblHead.appendChild(headerRow);
+
+      //Сортировка
+      $$('#tbl thead a[data-sort]').forEach(a => {
+        a.onclick = e => {
           e.preventDefault();
           const f = a.dataset.sort;
-          if (sort===f) dir = dir==='asc'?'desc':'asc';
-          else { sort = f; dir = 'asc'; }
-          page = 1; updateURL(); load();
+          if (sort === f) dir = dir === 'asc' ? 'desc' : 'asc';
+          else {
+            sort = f;
+            dir = 'asc';
+          }
+          page = 1;
+          updateURL();
+          load();
         };
       });
 
-      // строки
-      const body = $('#tbl tbody');
+      //Пользователи
       if (!data.users.length) {
-        body.innerHTML = '<tr><td colspan="6">Ничего не найдено</td></tr>';
+        const row = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = 6;
+        td.textContent = 'Ничего не найдено';
+        row.appendChild(td);
+        tblBody.appendChild(row);
       } else {
-        body.innerHTML = data.users.map(u=>`
-          <tr>
-            <td>${u[0]}</td>
-            <td>${u[1]}</td>
-            <td>${u[2]||'—'}</td>
-            <td>${u[3]}</td>
-            <td>${u[4]?'Заблокирован':'Активен'}</td>
-            <td>
-              <div class="action-wrapper">
-                <span class="action-btn">Выполнить действие</span>
-                <div class="action-menu">
-                  <button data-uid="${u[0]}" class="moder">Назначить модератором</button>
-                  <button data-uid="${u[0]}" class="toggle">${u[4]?'Разблокировать':'Заблокировать'}</button>
-                  <button data-uid="${u[0]}" class="delete red">Удалить</button>
-                </div>
-              </div>
-            </td>
-          </tr>`).join('');
-        // действия
-        $$('#tbl tbody .action-menu button').forEach(btn=>{
+        data.users.forEach(u => {
+          const row = document.createElement('tr');
+
+          const cells = [
+            u[0], // ID
+            u[1], //логин
+            u[2] || '—', // команда
+            u[3],  //роль
+            u[4] ? 'Заблокирован' : 'Активен' //cтатус
+          ];
+
+          cells.forEach(text => {
+            const td = document.createElement('td');
+            td.textContent = text;
+            row.appendChild(td);
+          });
+
+          // действия
+          const tdAction = document.createElement('td');
+          const wrapper = document.createElement('div');
+          wrapper.className = 'action-wrapper';
+
+          const btnSpan = document.createElement('span');
+          btnSpan.className = 'action-btn';
+          btnSpan.textContent = 'Выполнить действие';
+          wrapper.appendChild(btnSpan);
+
+          const menu = document.createElement('div');
+          menu.className = 'action-menu';
+
+          const buttons = [
+            { class: 'moder', text: 'Назначить модератором' },
+            { class: 'toggle', text: u[4] ? 'Разблокировать' : 'Заблокировать' },
+            { class: 'delete red', text: 'Удалить' }
+          ];
+
+          buttons.forEach(b => {
+            const btn = document.createElement('button');
+            btn.dataset.uid = u[0];
+            btn.className = b.class;
+            btn.textContent = b.text;
+            menu.appendChild(btn);
+          });
+
+          wrapper.appendChild(menu);
+          tdAction.appendChild(wrapper);
+          row.appendChild(tdAction);
+          tblBody.appendChild(row);
+        });
+
+        // Обработка кликов
+        $$('#tbl tbody .action-menu button').forEach(btn => {
           btn.onclick = async () => {
-            const uid = btn.dataset.uid, act = btn.classList.contains('moder') ? 'moder'
-                         : btn.classList.contains('toggle') ? 'toggle' : 'delete';
-            if ((act==='delete' || act==='moder') && !confirm(
-                  act==='delete'
-                    ? `Удалить пользователя ${uid}?`
-                    : `Назначить ${uid} модератором?`
-                )) return;
-            await fetch('/api/admin/user_action',{
-              method:'POST',
-              credentials:'include',
-              headers:{'Content-Type':'application/json'},
-              body:JSON.stringify({ uid, act })
+            const uid = btn.dataset.uid;
+            let act;
+            if (btn.classList.contains('moder')) act = 'moder';
+            else if (btn.classList.contains('toggle')) act = 'toggle';
+            else act = 'delete';
+
+            const confirmText = act === 'delete'
+              ? `Удалить пользователя ${uid}?`
+              : act === 'moder'
+                ? `Назначить ${uid} модератором?`
+                : null;
+
+            if (confirmText && !confirm(confirmText)) return;
+
+            await fetch('/api/admin/user_action', {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ uid, act })
             });
+
             load();
           };
         });
       }
 
-      // пагинация справа
-      for(let p=1; p<=data.pages; p++){
-        if (p===data.page) {
-          $('#pager').insertAdjacentHTML('beforeend',`<strong>${p}</strong>`);
+      // Пагинация
+      for (let p = 1; p <= data.pages; p++) {
+        if (p === data.page) {
+          const strong = document.createElement('strong');
+          strong.textContent = p;
+          pager.appendChild(strong);
         } else {
-          $('#pager').insertAdjacentHTML('beforeend',
-            `<a href="#" data-p="${p}">${p}</a>`);
+          const a = document.createElement('a');
+          a.href = '#';
+          a.dataset.p = p;
+          a.textContent = p;
+          pager.appendChild(a);
         }
       }
-      $$('#pager a').forEach(a=>{
-        a.onclick = e=>{
+
+      $$('#pager a').forEach(a => {
+        a.onclick = e => {
           e.preventDefault();
-          page = +a.dataset.p; updateURL(); load();
+          page = +a.dataset.p;
+          updateURL();
+          load();
         };
       });
     }

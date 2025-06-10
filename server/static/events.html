@@ -29,22 +29,31 @@
   <script type="module">
     import { initCommon } from '/static/js/common.js';
     await initCommon('События');
-
+  
     const $    = s => document.querySelector(s);
-    const html = s => { const t = document.createElement('template'); t.innerHTML = s.trim(); return t.content.firstChild; };
-
+  
+    // Функция безопасного создания элемента из строки без исполнения кода
+    function htmlSafe(tag, text, options = {}) {
+      const el = document.createElement(tag);
+      if (text !== undefined && text !== null) el.textContent = text;
+      for (const [key, val] of Object.entries(options)) {
+        el.setAttribute(key, val);
+      }
+      return el;
+    }
+  
+    // Вместо html(), будем создавать элементы вручную с textContent
+  
     let currentEvent = null;
     let leaderboard   = [];
     let lbPage        = 1;
     const PER         = 10;
     let pollId        = null;
-
-    // храним id завершённого события, которое пользователь закрыл
+  
     let dismissedEventId = localStorage.getItem('dismissedEventId');
-
+  
     document.addEventListener('click', e => {
       if (e.target && e.target.id === 'cancelBtn') {
-        // Отмена участия во время ожидания
         fetch('/api/events/leave', {
           method: 'POST',
           credentials: 'include',
@@ -56,32 +65,39 @@
         });
       }
     });
-
+  
     async function render() {
       clearInterval(pollId);
       lbPage = 1;
       const res = await fetch('/api/events', { credentials: 'include' });
       if (!res.ok) {
-        $('#content').innerHTML = `<p style="color:#fff;padding:18px">Ошибка загрузки событий.</p>`;
+        const root = $('#content');
+        root.textContent = '';
+        const errP = htmlSafe('p', 'Ошибка загрузки событий.');
+        errP.style.color = '#fff';
+        errP.style.padding = '18px';
+        root.appendChild(errP);
         return;
       }
       const { data } = await res.json();
-      const root    = $('#content');
-      root.innerHTML = '';
-
+      const root = $('#content');
+      root.textContent = '';
+  
       if (!data.team) {
-        root.appendChild(html(`<p style="color:#fff;padding:18px">Сначала нужно создать или присоединиться к команде.</p>`));
+        const p = htmlSafe('p', 'Сначала нужно создать или присоединиться к команде.');
+        p.style.color = '#fff';
+        p.style.padding = '18px';
+        root.appendChild(p);
         return;
       }
-
+  
       currentEvent = data.current_event;
       leaderboard   = data.leaderboard;
-
-      // если текущее событие завершено и его id совпадает с тем, что пользователь уже закрыл — скрываем его
+  
       if (currentEvent && currentEvent[2] === 'finished' && String(currentEvent[0]) === dismissedEventId) {
         currentEvent = null;
       }
-
+  
       if (!currentEvent) {
         showJoin(data.waiting);
       } else {
@@ -91,20 +107,41 @@
         else                            showFinished();
       }
     }
-
+  
     function showJoin(waiting) {
       const root = $('#content');
-      root.appendChild(html(`
-        <div class="content-box" style="max-width:420px;margin:auto">
-          <h3>Присоединиться по коду</h3>
-          <form id="joinF">
-            <input name="code" maxlength="16" required placeholder="Код события"
-                   style="padding:6px 8px;width:220px;margin-right:6px">
-            <button class="btn" type="submit">Присоединиться</button>
-          </form>
-        </div>
-      `));
-      $('#joinF').onsubmit = async e => {
+  
+      const box = document.createElement('div');
+      box.className = 'content-box';
+      box.style.maxWidth = '420px';
+      box.style.margin = 'auto';
+  
+      const h3 = htmlSafe('h3', 'Присоединиться по коду');
+      box.appendChild(h3);
+  
+      const form = document.createElement('form');
+      form.id = 'joinF';
+  
+      const input = document.createElement('input');
+      input.name = 'code';
+      input.maxLength = 16;
+      input.required = true;
+      input.placeholder = 'Код события';
+      input.style.padding = '6px 8px';
+      input.style.width = '220px';
+      input.style.marginRight = '6px';
+  
+      const btn = document.createElement('button');
+      btn.className = 'btn';
+      btn.type = 'submit';
+      btn.textContent = 'Присоединиться';
+  
+      form.appendChild(input);
+      form.appendChild(btn);
+      box.appendChild(form);
+      root.appendChild(box);
+  
+      form.onsubmit = async e => {
         e.preventDefault();
         const code = new FormData(e.target).get('code').trim();
         const res = await fetch('/api/events/join', {
@@ -119,21 +156,32 @@
         }
         await render();
       };
-
+  
       if (waiting.length) {
-        root.appendChild(html(`<h3 style="margin-top:24px;color:#fff">Доступные события</h3>`));
-        const grid = html('<div class="card-grid"></div>');
+        const h3waiting = htmlSafe('h3', 'Доступные события');
+        h3waiting.style.marginTop = '24px';
+        h3waiting.style.color = '#fff';
+        root.appendChild(h3waiting);
+  
+        const grid = document.createElement('div');
+        grid.className = 'card-grid';
+  
         waiting.forEach(ev => {
-          const card = html(`
-            <div class="card">
-              <h4>${ev[1]}</h4>
-              <p>${ev[3]}</p>
-              <p>Тип: ${ev[2].toUpperCase()}</p>
-              <p>Команд: ${ev[4]}</p>
-              <button class="btn" data-eid="${ev[0]}" type="button">Участвовать</button>
-            </div>
-          `);
-          card.querySelector('button').onclick = async () => {
+          const card = document.createElement('div');
+          card.className = 'card';
+  
+          const h4 = htmlSafe('h4', ev[1]);
+          const pDesc = htmlSafe('p', ev[3]);
+          const pType = htmlSafe('p', 'Тип: ' + ev[2].toUpperCase());
+          const pTeams = htmlSafe('p', 'Команд: ' + ev[4]);
+  
+          const button = document.createElement('button');
+          button.className = 'btn';
+          button.type = 'button';
+          button.textContent = 'Участвовать';
+          button.dataset.eid = ev[0];
+  
+          button.onclick = async () => {
             const res = await fetch('/api/events/join', {
               method:'POST', credentials:'include',
               headers:{'Content-Type':'application/json'},
@@ -146,53 +194,109 @@
             }
             await render();
           };
+  
+          card.appendChild(h4);
+          card.appendChild(pDesc);
+          card.appendChild(pType);
+          card.appendChild(pTeams);
+          card.appendChild(button);
+  
           grid.appendChild(card);
         });
         root.appendChild(grid);
       } else {
-        root.appendChild(html(`<p style="margin-top:20px;color:#fff">Нет доступных событий.</p>`));
+        const p = htmlSafe('p', 'Нет доступных событий.');
+        p.style.marginTop = '20px';
+        p.style.color = '#fff';
+        root.appendChild(p);
       }
     }
-
+  
     function showWaiting() {
-      const ev   = currentEvent;
+      const ev = currentEvent;
       const root = $('#content');
-      root.appendChild(html(`
-        <div class="content-box" style="max-width:480px;margin:auto">
-          <h2>${ev[1]}</h2>
-          <p>${ev[4]}</p>
-          <p style="color:#fff;margin-top:12px"><em>Ожидаем начала...</em></p>
-          <button id="cancelBtn" class="btn btn-outline" type="button" style="margin-top:12px">
-            Отменить участие
-          </button>
-        </div>
-      `));
+  
+      const box = document.createElement('div');
+      box.className = 'content-box';
+      box.style.maxWidth = '480px';
+      box.style.margin = 'auto';
+  
+      const h2 = htmlSafe('h2', ev[1]);
+      const pDesc = htmlSafe('p', ev[4]);
+      const pWaiting = htmlSafe('p', 'Ожидаем начала...');
+      pWaiting.style.color = '#fff';
+      pWaiting.style.marginTop = '12px';
+      pWaiting.style.fontStyle = 'italic';
+  
+      const btnCancel = document.createElement('button');
+      btnCancel.id = 'cancelBtn';
+      btnCancel.className = 'btn btn-outline';
+      btnCancel.type = 'button';
+      btnCancel.style.marginTop = '12px';
+      btnCancel.textContent = 'Отменить участие';
+  
+      box.appendChild(h2);
+      box.appendChild(pDesc);
+      box.appendChild(pWaiting);
+      box.appendChild(btnCancel);
+  
+      root.appendChild(box);
     }
-
+  
     function showRunning() {
-      const ev   = currentEvent;
+      const ev = currentEvent;
       const root = $('#content');
-      root.appendChild(html(`
-        <div class="content-box" style="max-width:600px;margin:auto">
-          <h2>${ev[1]}</h2>
-          <p>${ev[4]}</p>
-        </div>
-      `));
+  
+      const box = document.createElement('div');
+      box.className = 'content-box';
+      box.style.maxWidth = '600px';
+      box.style.margin = 'auto';
+  
+      const h2 = htmlSafe('h2', ev[1]);
+      const pDesc = htmlSafe('p', ev[4]);
+  
+      box.appendChild(h2);
+      box.appendChild(pDesc);
+      root.appendChild(box);
+  
       if (ev[5]) {
-        root.appendChild(html(`
-          <div style="text-align:center;margin:16px">
-            <a href="/static/${ev[5]}" class="link" download>Скачать задание</a>
-          </div>
-        `));
+        const div = document.createElement('div');
+        div.style.textAlign = 'center';
+        div.style.margin = '16px';
+  
+        const a = document.createElement('a');
+        a.href = `/static/${ev[5]}`;
+        a.className = 'link';
+        a.download = '';
+        a.textContent = 'Скачать задание';
+  
+        div.appendChild(a);
+        root.appendChild(div);
       }
-      root.appendChild(html(`
-        <form id="ansF" style="text-align:center;margin-bottom:24px">
-          <input name="answer" required placeholder="Ваш ответ"
-                 style="padding:6px 8px;width:240px;margin-right:6px">
-          <button class="btn" type="submit">Отправить</button>
-        </form>
-      `));
-      $('#ansF').onsubmit = async e => {
+  
+      const form = document.createElement('form');
+      form.id = 'ansF';
+      form.style.textAlign = 'center';
+      form.style.marginBottom = '24px';
+  
+      const input = document.createElement('input');
+      input.name = 'answer';
+      input.required = true;
+      input.placeholder = 'Ваш ответ';
+      input.style.padding = '6px 8px';
+      input.style.width = '240px';
+      input.style.marginRight = '6px';
+  
+      const btn = document.createElement('button');
+      btn.className = 'btn';
+      btn.type = 'submit';
+      btn.textContent = 'Отправить';
+  
+      form.appendChild(input);
+      form.appendChild(btn);
+      root.appendChild(form);
+  
+      form.onsubmit = async e => {
         e.preventDefault();
         const ans = new FormData(e.target).get('answer').trim();
         await fetch(`/api/events/submit/${ev[0]}`, {
@@ -203,70 +307,145 @@
         e.target.reset();
         await updateLB();
       };
-      root.appendChild(html(`<h3 style="color:#fff;text-align:center">Лидерборд</h3>`));
-      root.appendChild(html(`
-        <table class="admin-table small" id="lbTbl"><thead>
-          <tr><th>#</th><th>Команда</th><th>Очки</th></tr>
-        </thead><tbody></tbody></table>
-        <div class="table-pagination" id="lbPg" style="text-align:right;margin-top:8px"></div>
-      `));
+  
+      const h3 = htmlSafe('h3', 'Лидерборд');
+      h3.style.color = '#fff';
+      h3.style.textAlign = 'center';
+      root.appendChild(h3);
+  
+      const table = document.createElement('table');
+      table.className = 'admin-table small';
+      table.id = 'lbTbl';
+  
+      const thead = document.createElement('thead');
+      const trHead = document.createElement('tr');
+      ['#', 'Команда', 'Очки'].forEach(t => {
+        const th = document.createElement('th');
+        th.textContent = t;
+        trHead.appendChild(th);
+      });
+      thead.appendChild(trHead);
+      table.appendChild(thead);
+  
+      const tbody = document.createElement('tbody');
+      table.appendChild(tbody);
+      root.appendChild(table);
+  
+      const divPg = document.createElement('div');
+      divPg.className = 'table-pagination';
+      divPg.id = 'lbPg';
+      divPg.style.textAlign = 'right';
+      divPg.style.marginTop = '8px';
+      root.appendChild(divPg);
+  
       fillLB(leaderboard);
+  
       pollId = setInterval(updateLB, 5000);
     }
-
+  
     function showFinished() {
-      const ev   = currentEvent;
+      const ev = currentEvent;
       const root = $('#content');
-      root.appendChild(html(`
-        <div class="content-box" style="max-width:600px;margin:auto">
-          <h3 style="color:#fff">Событие завершено</h3>
-          <table class="admin-table small" id="lbTbl"><thead>
-            <tr><th>#</th><th>Команда</th><th>Очки</th></tr>
-          </thead><tbody></tbody></table>
-          <div class="table-pagination" id="lbPg" style="text-align:right;margin-top:8px"></div>
-          <div style="text-align:center">
-            <button id="closeBtn" class="btn" type="button" style="margin-top:16px">
-              Закрыть
-            </button>
-          </div>
-        </div>
-      `));
-      document.getElementById('closeBtn').onclick = () => {
-        // это событие пользователь закрыл
+  
+      const box = document.createElement('div');
+      box.className = 'content-box';
+      box.style.maxWidth = '600px';
+      box.style.margin = 'auto';
+  
+      const h3 = htmlSafe('h3', 'Событие завершено');
+      h3.style.color = '#fff';
+      box.appendChild(h3);
+  
+      const table = document.createElement('table');
+      table.className = 'admin-table small';
+      table.id = 'lbTbl';
+  
+      const thead = document.createElement('thead');
+      const trHead = document.createElement('tr');
+      ['#', 'Команда', 'Очки'].forEach(t => {
+        const th = document.createElement('th');
+        th.textContent = t;
+        trHead.appendChild(th);
+      });
+      thead.appendChild(trHead);
+      table.appendChild(thead);
+  
+      const tbody = document.createElement('tbody');
+      table.appendChild(tbody);
+      box.appendChild(table);
+  
+      const divPg = document.createElement('div');
+      divPg.className = 'table-pagination';
+      divPg.id = 'lbPg';
+      divPg.style.textAlign = 'right';
+      divPg.style.marginTop = '8px';
+      box.appendChild(divPg);
+  
+      const btnClose = document.createElement('button');
+      btnClose.id = 'closeBtn';
+      btnClose.className = 'btn';
+      btnClose.type = 'button';
+      btnClose.style.marginTop = '16px';
+      btnClose.textContent = 'Закрыть';
+  
+      btnClose.onclick = () => {
         localStorage.setItem('dismissedEventId', String(ev[0]));
         dismissedEventId = String(ev[0]);
         currentEvent = null;
         render();
       };
+  
+      const divBtn = document.createElement('div');
+      divBtn.style.textAlign = 'center';
+      divBtn.appendChild(btnClose);
+      box.appendChild(divBtn);
+  
+      root.appendChild(box);
+  
       fillLB(leaderboard);
     }
-
+  
     function fillLB(arr) {
       const tbody = $('#lbTbl tbody');
-      tbody.innerHTML = '';
+      tbody.textContent = '';
       const pages = Math.max(1, Math.ceil(arr.length / PER));
       if (lbPage > pages) lbPage = pages;
       arr.slice((lbPage-1)*PER, lbPage*PER).forEach(r => {
-        tbody.appendChild(html(`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`));
+        const tr = document.createElement('tr');
+        const td1 = document.createElement('td');
+        td1.textContent = r[0];
+        const td2 = document.createElement('td');
+        td2.textContent = r[1];
+        const td3 = document.createElement('td');
+        td3.textContent = r[2];
+        tr.appendChild(td1);
+        tr.appendChild(td2);
+        tr.appendChild(td3);
+        tbody.appendChild(tr);
       });
+  
       const pg = $('#lbPg');
-      pg.innerHTML = '';
+      pg.textContent = '';
       for (let p = 1; p <= pages; p++) {
-        pg.insertAdjacentHTML('beforeend',
-          p === lbPage
-            ? `<strong>${p}</strong>`
-            : `<a href="#" data-p="${p}">${p}</a>`
-        );
+        if (p === lbPage) {
+          const strong = document.createElement('strong');
+          strong.textContent = p;
+          pg.appendChild(strong);
+        } else {
+          const a = document.createElement('a');
+          a.href = '#';
+          a.dataset.p = p;
+          a.textContent = p;
+          a.onclick = e => {
+            e.preventDefault();
+            lbPage = +a.dataset.p;
+            fillLB(arr);
+          };
+          pg.appendChild(a);
+        }
       }
-      pg.querySelectorAll('a[data-p]').forEach(a => {
-        a.onclick = e => {
-          e.preventDefault();
-          lbPage = +a.dataset.p;
-          fillLB(arr);
-        };
-      });
     }
-
+  
     async function updateLB() {
       const res = await fetch('/api/events', { credentials:'include' });
       if (!res.ok) return;
@@ -274,9 +453,9 @@
       leaderboard = data.leaderboard;
       fillLB(leaderboard);
     }
-
+  
     render();
   </script>
-
+  
 </body>
 </html>

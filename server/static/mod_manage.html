@@ -22,9 +22,7 @@
   </header>
 
   <main style="padding:24px">
-    <!-- ввод кода-->
     <div id="codeBox" class="content-box" style="max-width:340px;margin-bottom:20px;display:none"></div>
-
     <div id="activeSection" class="card-grid"></div>
     <div id="manageSection" class="content-box" style="display:none"></div>
   </main>
@@ -38,7 +36,7 @@
     const $$ = s=>document.querySelectorAll(s);
     const params = new URLSearchParams(location.search);
     let code = params.get('code') || '';
-    const PER_PAGE = 15;             // строк на страницу в таблице команд
+    const PER_PAGE = 15; // строк на страницу в таблице команд
     let page = 1;
 
     async function load(){
@@ -46,7 +44,7 @@
       else    { await loadActive(); }
     }
 
-    /* список активных / поле ввода  */
+    // список активных 
     async function loadActive(){
       page = 1;
       $('#manageSection').style.display = 'none';
@@ -85,7 +83,7 @@
       });
     }
 
-    /*управление выбранным  */
+    // управление выбранным  
     async function loadManage(){
       $('#activeSection').style.display = 'none';
       $('#codeBox').style.display      = 'none';
@@ -151,7 +149,7 @@
         </table>
         ${pagHTML}`;
 
-      /*  кнопки  */
+      
       $('#backBtn').onclick = ()=>{ code=''; params.delete('code'); history.replaceState(null,'','?'+params); loadActive(); };
       $('#refreshBtn').onclick = ()=> loadManage();
 

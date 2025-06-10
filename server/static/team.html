@@ -28,56 +28,106 @@
   <script type="module">
     import { initCommon } from '/static/js/common.js';
     await initCommon('Команда');
-
-    const html = s => {
-      const t = document.createElement('template');
-      t.innerHTML = s.trim();
-      return t.content.firstChild;
-    };
+  
     const qs = new URLSearchParams(location.search);
-    let page = Math.max(parseInt(qs.get('page')||'1', 10), 1);
-
+    let page = Math.max(parseInt(qs.get('page') || '1', 10), 1);
+  
+    // Создаём элемент с текстом безопасно
+    function createTextElement(tag, text, attrs = {}) {
+      const el = document.createElement(tag);
+      if (typeof text === 'string') el.textContent = text;
+      else if (text instanceof Node) el.appendChild(text);
+      for (const [k, v] of Object.entries(attrs)) {
+        if (k === 'class') el.className = v;
+        else el.setAttribute(k, v);
+      }
+      return el;
+    }
+  
+    // Упрощённый html -> элемент для шаблонов без динамики (или с доверенным контентом)
+    function htmlSafe(tag, content = '', attrs = {}) {
+      const el = document.createElement(tag);
+      if (content) {
+        if (typeof content === 'string') el.textContent = content;
+        else if (content instanceof Node) el.appendChild(content);
+        else if (Array.isArray(content)) content.forEach(c => {
+          if (typeof c === 'string') el.appendChild(document.createTextNode(c));
+          else if (c instanceof Node) el.appendChild(c);
+        });
+      }
+      for (const [k, v] of Object.entries(attrs)) {
+        if (k === 'class') el.className = v;
+        else el.setAttribute(k, v);
+      }
+      return el;
+    }
+  
     async function load() {
-      const r = await fetch(`/api/team?page=${page}`, { credentials:'include' });
+      const r = await fetch(`/api/team?page=${page}`, { credentials: 'include' });
       const { data } = await r.json();
       const root = document.getElementById('root');
       root.innerHTML = '';
-
+  
       if (!data || !data.team) {
-        root.appendChild(html(`
-          <div class="content-box" style="max-width:480px;margin:auto">
-            <h3>Создать команду</h3>
-            <form id="cForm" style="margin-bottom:24px">
-              <label>Название команды<br>
-                <input name="team_name" required maxlength="16" placeholder="Название"
-                       style="width:100%;padding:8px;margin-top:4px">
-              </label>
-              <label>Код-приглашение<br>
-                <input name="invite_code" required maxlength="16" placeholder="Код приглашения"
-                       style="width:100%;padding:8px;margin-top:4px">
-              </label>
-              <button class="btn" style="margin-top:12px">Создать</button>
-            </form>
-            <hr style="border-color:#375176;margin:24px 0">
-            <h3>Присоединиться к команде</h3>
-            <form id="jForm">
-              <label>Код команды<br>
-                <input name="invite_code" required maxlength="16" placeholder="Введите код"
-                       style="width:100%;padding:8px;margin-top:4px">
-              </label>
-              <button class="btn btn-outline" style="margin-top:12px">
-                Присоединиться
-              </button>
-            </form>
-          </div>
-        `));
-
-        document.getElementById('cForm').onsubmit = async e => {
+        const box = htmlSafe('div', '', { class: 'content-box', style: 'max-width:480px;margin:auto' });
+  
+        const h3Create = createTextElement('h3', 'Создать команду');
+        box.appendChild(h3Create);
+  
+        // Создать команду форма
+        const cForm = htmlSafe('form', '', { id: 'cForm', style: 'margin-bottom:24px' });
+        const labelName = htmlSafe('label', '', {});
+        labelName.appendChild(document.createTextNode('Название команды'));
+        labelName.appendChild(document.createElement('br'));
+        const inputName = htmlSafe('input', '', {
+          name: 'team_name', required: '', maxlength: '16', placeholder: 'Название',
+          style: 'width:100%;padding:8px;margin-top:4px'
+        });
+        labelName.appendChild(inputName);
+        cForm.appendChild(labelName);
+  
+        const labelCode = htmlSafe('label', '', {});
+        labelCode.appendChild(document.createTextNode('Код-приглашение'));
+        labelCode.appendChild(document.createElement('br'));
+        const inputCode = htmlSafe('input', '', {
+          name: 'invite_code', required: '', maxlength: '16', placeholder: 'Код приглашения',
+          style: 'width:100%;padding:8px;margin-top:4px'
+        });
+        labelCode.appendChild(inputCode);
+        cForm.appendChild(labelCode);
+  
+        const btnCreate = htmlSafe('button', 'Создать', { class: 'btn', style: 'margin-top:12px' });
+        cForm.appendChild(btnCreate);
+        box.appendChild(cForm);
+  
+        box.appendChild(htmlSafe('hr', '', { style: 'border-color:#375176;margin:24px 0' }));
+  
+        const h3Join = createTextElement('h3', 'Присоединиться к команде');
+        box.appendChild(h3Join);
+  
+        const jForm = htmlSafe('form', '', { id: 'jForm' });
+        const labelJoinCode = htmlSafe('label', '', {});
+        labelJoinCode.appendChild(document.createTextNode('Код команды'));
+        labelJoinCode.appendChild(document.createElement('br'));
+        const inputJoinCode = htmlSafe('input', '', {
+          name: 'invite_code', required: '', maxlength: '16', placeholder: 'Введите код',
+          style: 'width:100%;padding:8px;margin-top:4px'
+        });
+        labelJoinCode.appendChild(inputJoinCode);
+        jForm.appendChild(labelJoinCode);
+  
+        const btnJoin = htmlSafe('button', 'Присоединиться', { class: 'btn btn-outline', style: 'margin-top:12px' });
+        jForm.appendChild(btnJoin);
+        box.appendChild(jForm);
+  
+        root.appendChild(box);
+  
+        cForm.onsubmit = async e => {
           e.preventDefault();
           const fd = new FormData(e.target);
           const res = await fetch('/api/team/create', {
-            method:'POST', credentials:'include',
-            headers:{'Content-Type':'application/json'},
+            method: 'POST', credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               team_name: fd.get('team_name'),
               invite_code: fd.get('invite_code')
@@ -89,15 +139,15 @@
             alert(msg || 'Ошибка при создании команды');
           }
         };
-
-        document.getElementById('jForm').onsubmit = async e => {
+  
+        jForm.onsubmit = async e => {
           e.preventDefault();
           const fd = new FormData(e.target);
           const code = fd.get('invite_code').trim();
           if (!code) return;
           const res = await fetch('/api/team/join', {
-            method:'POST', credentials:'include',
-            headers:{'Content-Type':'application/json'},
+            method: 'POST', credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ invite_code: code })
           });
           if (res.ok) load();
@@ -106,86 +156,113 @@
             alert(msg || 'Неверный код команды');
           }
         };
-
         return;
       }
-
+  
       // Отображаем существующую команду
       const t = data;
-      root.appendChild(html(`
-        <div class="content-box">
-          <h2>${t.team.team_name}<small> (Код-приглашение:</small> ${t.team.invite_code})</h2>
-          <h3>Участники</h3>
-          <ul id="mList"></ul>
-          <form id="leaveForm" style="margin-top:14px">
-            <button class="btn btn-outline" style="background:#e05555;color:#fff">
-              Покинуть команду
-            </button>
-          </form>
-        </div>
-      `));
+      const box = htmlSafe('div', '', { class: 'content-box' });
+      const h2 = document.createElement('h2');
+      h2.textContent = t.team.team_name;
+      const small = document.createElement('small');
+      small.textContent = ` (Код-приглашение: ${t.team.invite_code})`;
+      h2.appendChild(small);
+      box.appendChild(h2);
+  
+      const h3m = createTextElement('h3', 'Участники');
+      box.appendChild(h3m);
+  
+      const ul = document.createElement('ul');
+      ul.id = 'mList';
+      box.appendChild(ul);
+  
+      const leaveForm = htmlSafe('form', '', { id: 'leaveForm', style: 'margin-top:14px' });
+      const btnLeave = htmlSafe('button', 'Покинуть команду', { class: 'btn btn-outline', style: 'background:#e05555;color:#fff' });
+      leaveForm.appendChild(btnLeave);
+      box.appendChild(leaveForm);
+  
+      root.appendChild(box);
+  
       t.members.forEach(m => {
-        const li = html(`<li>${m.username}</li>`);
+        const li = document.createElement('li');
+        li.textContent = m.username;
         if (m.is_blocked) li.style.color = '#e05555';
-        document.getElementById('mList').appendChild(li);
+        ul.appendChild(li);
       });
-      document.getElementById('leaveForm').onsubmit = async e => {
+  
+      leaveForm.onsubmit = async e => {
         e.preventDefault();
         if (!confirm('Покинуть команду?')) return;
-        await fetch('/api/team/leave', { method:'POST', credentials:'include' });
+        await fetch('/api/team/leave', { method: 'POST', credentials: 'include' });
         load();
       };
-
+  
       // Статистика
-      root.appendChild(html(`
-        <div class="content-box">
-          <h3>Статистика команды</h3>
-          <p>Событий: <strong>${t.stats.total}</strong></p>
-          <p>Побед:   <strong>${t.stats.wins}</strong></p>
-        </div>
-      `));
-
+      const statsBox = htmlSafe('div', '', { class: 'content-box' });
+      statsBox.appendChild(createTextElement('h3', 'Статистика команды'));
+      statsBox.appendChild(createTextElement('p', '', {}));
+      statsBox.lastChild.innerHTML = `Событий: <strong>${t.stats.total}</strong>`;
+      statsBox.appendChild(createTextElement('p', '', {}));
+      statsBox.lastChild.innerHTML = `Побед:   <strong>${t.stats.wins}</strong>`;
+      root.appendChild(statsBox);
+  
       // История
-      const histRes = await fetch(`/api/team/history?page=${page}`, { credentials:'include' });
+      const histRes = await fetch(`/api/team/history?page=${page}`, { credentials: 'include' });
       if (histRes.ok) {
         const { history, pages } = (await histRes.json()).data;
         if (history.length) {
-          const box = html(`
-            <div class="content-box">
-              <h3>История событий</h3>
-              <table class="admin-table small">
-                <thead><tr>
-                  <th>Название</th><th>Дата</th><th>Счёт</th><th>Победитель</th>
-                </tr></thead>
-                <tbody id="histBody"></tbody>
-              </table>
-              <div class="table-pagination" id="histPager"
-                   style="text-align:right;margin-top:8px"></div>
-            </div>
-          `);
+          const histBox = htmlSafe('div', '', { class: 'content-box' });
+  
+          histBox.appendChild(createTextElement('h3', 'История событий'));
+  
+          const table = htmlSafe('table', '', { class: 'admin-table small' });
+          const thead = document.createElement('thead');
+          thead.innerHTML = '<tr><th>Название</th><th>Дата</th><th>Счёт</th><th>Победитель</th></tr>';
+          table.appendChild(thead);
+          const tbody = document.createElement('tbody');
+          tbody.id = 'histBody';
+  
           history.forEach(r => {
-            box.querySelector('#histBody').appendChild(html(`
-              <tr>
-                <td>${r.name}</td><td>${r.date}</td>
-                <td>${r.my_pts}</td><td>${r.winner}</td>
-              </tr>
-            `));
+            const tr = document.createElement('tr');
+            const tdName = document.createElement('td');
+            tdName.textContent = r.name;
+            const tdDate = document.createElement('td');
+            tdDate.textContent = r.date;
+            const tdScore = document.createElement('td');
+            tdScore.textContent = r.my_pts;
+            const tdWinner = document.createElement('td');
+            tdWinner.textContent = r.winner;
+            tr.append(tdName, tdDate, tdScore, tdWinner);
+            tbody.appendChild(tr);
           });
-          const pager = box.querySelector('#histPager');
+  
+          table.appendChild(tbody);
+          histBox.appendChild(table);
+  
+          // Пагинация
+          const pager = htmlSafe('div', '', { id: 'histPager', style: 'text-align:right;margin-top:8px' });
           for (let p = 1; p <= pages; p++) {
-            pager.appendChild(html(
-              p === page
-                ? `<strong>${p}</strong>`
-                : `<a href="?page=${p}">${p}</a>`
-            ));
+            if (p === page) {
+              const strong = document.createElement('strong');
+              strong.textContent = p;
+              pager.appendChild(strong);
+            } else {
+              const a = document.createElement('a');
+              a.href = `?page=${p}`;
+              a.textContent = p;
+              pager.appendChild(a);
+            }
           }
-          root.appendChild(box);
+          histBox.appendChild(pager);
+  
+          root.appendChild(histBox);
         }
       }
     }
-
+  
     load();
   </script>
+  
 
 </body>
 </html>

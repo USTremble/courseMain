@@ -1,9 +1,10 @@
 CREATE TABLE users (
     user_id SERIAL PRIMARY KEY,
-    username VARCHAR(32) NOT NULL UNIQUE,
+    username VARCHAR(32) NOT NULL,
     password TEXT NOT NULL,
     role VARCHAR(10) NOT NULL DEFAULT 'player',
-    is_blocked BOOLEAN NOT NULL DEFAULT FALSE
+    is_blocked BOOLEAN NOT NULL DEFAULT FALSE,
+    UNIQUE(user_id, username)
 );
 
 
@@ -31,8 +32,9 @@ CREATE TABLE team_members (
     team_id INTEGER NOT NULL,
     active BOOLEAN DEFAULT TRUE,
     PRIMARY KEY (user_id, team_id),
-    FOREIGN KEY (user_id) REFERENCES users(user_id),
-    FOREIGN KEY (team_id) REFERENCES teams(team_id)
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (team_id) REFERENCES teams(team_id) ON DELETE CASCADE,
+    UNIQUE(user_id, team_id)
 );
 
 CREATE TABLE event_teams (
@@ -40,8 +42,8 @@ CREATE TABLE event_teams (
     event_id INTEGER NOT NULL,
     team_id INTEGER NOT NULL,
     points INTEGER NOT NULL DEFAULT 0,
-    FOREIGN KEY (event_id) REFERENCES events(event_id),
-    FOREIGN KEY (team_id) REFERENCES teams(team_id)
+    FOREIGN KEY (event_id) REFERENCES events(event_id) ON DELETE CASCADE,
+    FOREIGN KEY (team_id) REFERENCES teams(team_id) ON DELETE CASCADE
 );
 
 CREATE TABLE event_submits (
@@ -51,9 +53,9 @@ CREATE TABLE event_submits (
     user_id INTEGER NOT NULL,
     answer TEXT NOT NULL,
     ts TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT now(),
-    FOREIGN KEY (event_id) REFERENCES events(event_id),
-    FOREIGN KEY (team_id) REFERENCES teams(team_id),
-    FOREIGN KEY (user_id) REFERENCES users(user_id)
+    FOREIGN KEY (event_id) REFERENCES events(event_id) ON DELETE CASCADE, 
+    FOREIGN KEY (team_id) REFERENCES teams(team_id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS teams_name_unique ON teams (team_name);

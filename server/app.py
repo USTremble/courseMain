@@ -24,16 +24,16 @@ UPLOAD_DIR = os.path.join(app.static_folder, "tasks")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 EVENTS_PER_PAGE = 10
-PER_PAGE        = 10
-HIST_PER_PAGE   = 15
+PER_PAGE = 10
+HIST_PER_PAGE = 15
 
 def get_db_connection():
     return psycopg2.connect(
-        dbname   = os.getenv("DB_NAME", "competition"),
-        user     = os.getenv("DB_USER", "uster"),
+        dbname = os.getenv("DB_NAME", "competition"),
+        user = os.getenv("DB_USER", "uster"),
         password = os.getenv("DB_PASS", "1234"),
-        host     = os.getenv("DB_HOST", "localhost"),
-        port     = os.getenv("DB_PORT", "5432")
+        host = os.getenv("DB_HOST", "localhost"),
+        port = os.getenv("DB_PORT", "5432")
     )
 
 def json_error(code, msg):
@@ -514,12 +514,12 @@ def submit_answer(eid):
 @app.route('/api/mod/events', methods=['POST'])
 @moderator_required
 def mod_create():
-    code    = (request.form.get('code') or '').strip()[:16]
-    name    = request.form.get('name','').strip()[:64]
-    desc    = request.form.get('desc','').strip()
+    code = (request.form.get('code') or '').strip()[:16]
+    name = request.form.get('name','').strip()[:64]
+    desc = request.form.get('desc','').strip()
     ev_type = request.form.get('ev_type','').strip()
-    answer  = request.form.get('answer','').strip()
-    pdf     = request.files.get('task')
+    answer = request.form.get('answer','').strip()
+    pdf = request.files.get('task')
 
     if not code: # все поля обязательны
         return json_error(400, 'Код события обязателен')
@@ -634,9 +634,9 @@ def mod_manage_patch(code):
 @app.get('/api/admin/users')
 @admin_required
 def admin_users():
-    page  = max(int(request.args.get('page', 1)), 1)
-    q     = request.args.get('q', '').strip()
-    sort  = request.args.get('sort', 'user_id')
+    page = max(int(request.args.get('page', 1)), 1)
+    q = request.args.get('q', '').strip()
+    sort = request.args.get('sort', 'user_id')
     order = request.args.get('dir',  'asc')
 
     if sort not in {'user_id','username','role','is_blocked'}:
@@ -730,9 +730,9 @@ def admin_user_action():
 @app.get('/api/admin/teams')
 @admin_required
 def admin_teams():
-    page  = max(int(request.args.get('page', 1)), 1)
-    q     = request.args.get('q', '').strip()
-    sort  = request.args.get('sort', 'team_id')
+    page = max(int(request.args.get('page', 1)), 1)
+    q = request.args.get('q', '').strip()
+    sort = request.args.get('sort', 'team_id')
     order = request.args.get('dir',  'asc')
     if sort not in {'team_id','team_name','members'}:
         sort = 'team_id'
